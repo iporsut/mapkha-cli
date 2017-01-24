@@ -4,12 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
-	"strings"
 
+	"github.com/pkg/profile"
 	m "github.com/veer66/mapkha"
 )
 
@@ -20,8 +19,6 @@ func check(e error) {
 }
 
 var dixPath string
-var cpuprofile string
-var memprofile string
 
 func init() {
 	flag.StringVar(&dixPath, "dix", "", "Dictionary path")
@@ -29,8 +26,10 @@ func init() {
 
 func main() {
 	flag.Parse()
+	s := profile.Start(profile.CPUProfile, profile.ProfilePath("."))
+	defer s.Stop()
 
-	var dict *m.Dict
+	var dict m.PrefixTree
 	var e error
 	if dixPath == "" {
 		dict, e = m.LoadDefaultDict()
@@ -38,13 +37,15 @@ func main() {
 		dict, e = m.LoadDict(dixPath)
 	}
 	check(e)
-	wordcut := m.NewWordcut(dict)
+	m.MakeEdgeBuilders(dict)
 	b, err := ioutil.ReadAll(os.Stdin)
 	if err != nil {
 		log.Fatal("could not read input:", err)
 	}
 	scanner := bufio.NewScanner(bytes.NewReader(b))
+	outbuf := bufio.NewWriter(os.Stdout)
 	for scanner.Scan() {
-		fmt.Println(strings.Join(wordcut.Segment(scanner.Text()), "|"))
+		m.Segment(outbuf, scanner.Text())
 	}
+	outbuf.Flush()
 }
